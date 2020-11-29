@@ -1,0 +1,13 @@
+package database
+
+// Database represents a kev-value store, that stores all the key-value data.
+// This allows insertion, querying and deleting of the key-value pairs.
+type Database interface {
+	// Insert allows to insert any key value pair into the database.
+	Insert(interface{}, interface{}) error
+	// Query returns the most recent value for the key being queried in
+	// the data base.
+	Query(interface{}) (interface{}, error)
+	// Delete removes all the key-value pairs in the database with the given key.
+	Delete(interface{}) error
+}
