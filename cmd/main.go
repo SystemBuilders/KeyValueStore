@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -8,7 +9,8 @@ import (
 )
 
 func main() {
-	kv, err := database.NewKeyValueStore()
+	ctx := context.Background()
+	kv, err := database.NewKeyValueStore(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -28,7 +30,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	data, err := kv.Query("key1")
+	data, err := kv.Query("key2")
 	if err != nil {
 		log.Fatal(err)
 	}

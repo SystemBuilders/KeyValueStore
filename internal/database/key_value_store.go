@@ -1,7 +1,10 @@
 package database
 
 import (
+	"context"
 	"encoding/json"
+
+	"github.com/SystemBuilders/KeyValueStore/internal/merge"
 
 	"github.com/SystemBuilders/KeyValueStore/internal/file"
 )
@@ -29,6 +32,7 @@ func NewObject(key, value interface{}) Object {
 
 // KeyValueStore implements the Database interface.
 type KeyValueStore struct {
+	ctx context.Context
 	// f is the file where the kv store appends structured
 	// logs.
 	f *file.File
@@ -44,13 +48,20 @@ type KeyValueStore struct {
 var _ (Database) = (*KeyValueStore)(nil)
 
 // NewKeyValueStore retunrs a new instance of a KV store.
-func NewKeyValueStore() (*KeyValueStore, error) {
+func NewKeyValueStore(ctx context.Context) (*KeyValueStore, error) {
 	f, err := file.NewFile()
 	if err != nil {
 		return nil, err
 	}
 
+	// A new WatchSet is created and set to run in
+	// parallel to merge the segments of files whenever
+	// necessary.
+	ws := merge.NewWatchSet(ctx, f)
+	go ws.RunJob()
+
 	return &KeyValueStore{
+		ctx:           ctx,
 		f:             f,
 		index:         make(map[interface{}]ObjectLocation),
 		prevObjLength: 0,
@@ -88,5 +99,5 @@ func (kv *KeyValueStore) Delete(key interface{}) error {
 
 func (kv *KeyValueStore) indexLog(key interface{}, data []byte) {
 	kv.index[key] = ObjectLocation{kv.prevObjLength, len(data)}
-	kv.prevObjLength = len(data)
+	kv.prevObjLength += len(data)
 }
