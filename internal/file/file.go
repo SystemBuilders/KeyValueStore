@@ -1,20 +1,22 @@
 package file
 
 import (
+	"io"
 	"os"
 	"time"
 )
 
 // MaxFileSize signifies the max file size accepted
 // by the key-value store.
-var MaxFileSize int64 = 100000
+var MaxFileSize int64 = 10
 
 // File is an abstraction over the os.File package.
 // This enables handling multiple files that may be carrying the
 // data of the KV store using a single struct.
 type File struct {
-	fName []string
-	fs    []*os.File
+	fName           []string
+	fs              []*os.File
+	activeFileIndex int
 
 	// MergeNeeded signifies whether there exists
 	// more than one file segment and a merge is needed.
@@ -25,9 +27,10 @@ type File struct {
 func NewFile() (*File, error) {
 
 	file := &File{
-		fs:          []*os.File{},
-		fName:       []string{},
-		MergeNeeded: false,
+		fs:              []*os.File{},
+		fName:           []string{},
+		activeFileIndex: 0,
+		MergeNeeded:     false,
 	}
 
 	err := createNewFileSegment(file)
@@ -39,12 +42,14 @@ func NewFile() (*File, error) {
 }
 
 // Append appends the given string to the end of the file.
-func (f *File) Append(s string) error {
+// It returns the segment of the file that the object was
+// appended to, which helps the indexer to increase precision.
+func (f *File) Append(s string) (int, error) {
 	activeFileIndex := f.seekToActiveFileSegment()
 
 	info, err := os.Stat(f.fName[activeFileIndex])
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	// If a file segment exceeds a known limit, create a
@@ -52,26 +57,32 @@ func (f *File) Append(s string) error {
 	if info.Size() > MaxFileSize {
 		err = createNewFileSegment(f)
 		if err != nil {
-			return err
+			return -1, err
 		}
-
+		f.activeFileIndex++
 		f.MergeNeeded = true
 	}
 
 	file := f.fs[activeFileIndex]
 	_, err = file.WriteString(s)
-	return err
+	if err != nil {
+		return -1, err
+	}
+	return f.activeFileIndex, err
 }
 
 // ReadAt reads the file at the given offset and for the
 // specified length.
-func (f *File) ReadAt(offset, length int) (string, error) {
+func (f *File) ReadAt(offset, length, segment int) (string, error) {
 	b := make([]byte, length)
 
-	activeFileIndex := f.seekToActiveFileSegment()
-	file := f.fs[activeFileIndex]
+	file := f.fs[segment]
 	_, err := file.ReadAt(b, int64(offset))
 	if err != nil {
+		// The new file may not contain the
+		if err == io.EOF {
+
+		}
 		return "", err
 	}
 	return string(b), nil
@@ -82,7 +93,7 @@ func (f *File) ReadAt(offset, length int) (string, error) {
 // TODO: Figure out a way to maintain a pointer to the
 // active file.
 func (f *File) seekToActiveFileSegment() int {
-	return 0
+	return f.activeFileIndex
 }
 
 // createNewFileSegment needs the parent File structure as an

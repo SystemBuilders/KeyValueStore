@@ -20,6 +20,8 @@ type Object struct {
 type ObjectLocation struct {
 	offset int
 	size   int
+
+	Segment int
 }
 
 // NewObject returns a new instance of an object.
@@ -43,6 +45,7 @@ type KeyValueStore struct {
 	// appended object. This is used to index the next
 	// log.
 	prevObjLength int
+	currSegment   int
 }
 
 var _ (Database) = (*KeyValueStore)(nil)
@@ -65,6 +68,7 @@ func NewKeyValueStore(ctx context.Context) (*KeyValueStore, error) {
 		f:             f,
 		index:         make(map[interface{}]ObjectLocation),
 		prevObjLength: 0,
+		currSegment:   -1,
 	}, nil
 }
 
@@ -76,15 +80,24 @@ func (kv *KeyValueStore) Insert(key, value interface{}) error {
 		return err
 	}
 
-	kv.indexLog(key, data)
-	return kv.f.Append(string(data))
+	segment, err := kv.f.Append(string(data))
+	if err != nil {
+		return err
+	}
+
+	if kv.currSegment == -1 {
+		kv.currSegment = segment
+	}
+
+	kv.indexLog(key, data, segment)
+	return nil
 }
 
 // Query returns the last appended Object type from the file, or
 // the encountered error.
 func (kv *KeyValueStore) Query(key interface{}) (interface{}, error) {
 	logIndex := kv.index[key]
-	data, err := kv.f.ReadAt(logIndex.offset, logIndex.size)
+	data, err := kv.f.ReadAt(logIndex.offset, logIndex.size, logIndex.Segment)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +110,23 @@ func (kv *KeyValueStore) Delete(key interface{}) error {
 	return nil
 }
 
-func (kv *KeyValueStore) indexLog(key interface{}, data []byte) {
-	kv.index[key] = ObjectLocation{kv.prevObjLength, len(data)}
+// indexLog indexes the log that was appended to the file.
+func (kv *KeyValueStore) indexLog(key interface{}, data []byte, segment int) {
+
+	var offset int
+	// If this object was appended to a new segment,
+	// its offset is zero.
+	if kv.currSegment != segment {
+		offset = 0
+		kv.prevObjLength = 0
+	} else {
+		offset = kv.prevObjLength
+	}
+
+	kv.index[key] = ObjectLocation{
+		offset:  offset,
+		size:    len(data),
+		Segment: segment,
+	}
 	kv.prevObjLength += len(data)
 }

@@ -30,7 +30,22 @@ func main() {
 		log.Fatal(err)
 	}
 
-	data, err := kv.Query("key2")
+	err = kv.Insert("key3", "value")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = kv.Insert("key4", "value1")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = kv.Insert("key5", "value2")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	data, err := kv.Query("key4")
 	if err != nil {
 		log.Fatal(err)
 	}
