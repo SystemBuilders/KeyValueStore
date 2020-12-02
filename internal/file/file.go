@@ -4,6 +4,8 @@ import (
 	"io"
 	"os"
 	"time"
+
+	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
 )
 
 // MaxFileSize signifies the max file size accepted
@@ -72,12 +74,13 @@ func (f *File) Append(s string) (int, error) {
 }
 
 // ReadAt reads the file at the given offset and for the
-// specified length.
-func (f *File) ReadAt(offset, length, segment int) (string, error) {
-	b := make([]byte, length)
+// specified length. If there is an error, it will originate
+// from a file read.
+func (f *File) ReadAt(loc indexer.ObjectLocation) (string, error) {
+	b := make([]byte, loc.Size)
 
-	file := f.fs[segment]
-	_, err := file.ReadAt(b, int64(offset))
+	file := f.fs[loc.Segment]
+	_, err := file.ReadAt(b, int64(loc.Offset))
 	if err != nil {
 		// The new file may not contain the
 		if err == io.EOF {

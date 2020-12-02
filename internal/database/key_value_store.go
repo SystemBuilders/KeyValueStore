@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
 	"github.com/SystemBuilders/KeyValueStore/internal/merge"
 
 	"github.com/SystemBuilders/KeyValueStore/internal/file"
@@ -13,15 +14,6 @@ import (
 type Object struct {
 	Key   interface{}
 	Value interface{}
-}
-
-// ObjectLocation desribes the precise location of an Object
-// in the database file.
-type ObjectLocation struct {
-	offset int
-	size   int
-
-	Segment int
 }
 
 // NewObject returns a new instance of an object.
@@ -38,9 +30,10 @@ type KeyValueStore struct {
 	// f is the file where the kv store appends structured
 	// logs.
 	f *file.File
-	// index is a map indexing the key in the store to
-	// the byte offset in the file.
-	index map[interface{}]ObjectLocation
+	// index is the way the file pertaining to the key-value
+	// store is indexed. This can be used to implement
+	// differet indexing methods for different performance needs.
+	index indexer.Indexer
 	// prevObjLength specifies the length of the last
 	// appended object. This is used to index the next
 	// log.
@@ -63,10 +56,11 @@ func NewKeyValueStore(ctx context.Context) (*KeyValueStore, error) {
 	ws := merge.NewWatchSet(ctx, f)
 	go ws.RunJob()
 
+	index := indexer.NewMapIndexer()
 	return &KeyValueStore{
 		ctx:           ctx,
 		f:             f,
-		index:         make(map[interface{}]ObjectLocation),
+		index:         index,
 		prevObjLength: 0,
 		currSegment:   -1,
 	}, nil
@@ -96,8 +90,8 @@ func (kv *KeyValueStore) Insert(key, value interface{}) error {
 // Query returns the last appended Object type from the file, or
 // the encountered error.
 func (kv *KeyValueStore) Query(key interface{}) (interface{}, error) {
-	logIndex := kv.index[key]
-	data, err := kv.f.ReadAt(logIndex.offset, logIndex.size, logIndex.Segment)
+	logIndex := kv.index.Query(key)
+	data, err := kv.f.ReadAt(logIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +106,6 @@ func (kv *KeyValueStore) Delete(key interface{}) error {
 
 // indexLog indexes the log that was appended to the file.
 func (kv *KeyValueStore) indexLog(key interface{}, data []byte, segment int) {
-
 	var offset int
 	// If this object was appended to a new segment,
 	// its offset is zero.
@@ -123,10 +116,11 @@ func (kv *KeyValueStore) indexLog(key interface{}, data []byte, segment int) {
 		offset = kv.prevObjLength
 	}
 
-	kv.index[key] = ObjectLocation{
-		offset:  offset,
-		size:    len(data),
+	kv.index.Store(key, indexer.ObjectLocation{
+		Offset:  offset,
+		Size:    len(data),
 		Segment: segment,
-	}
+	})
+
 	kv.prevObjLength += len(data)
 }

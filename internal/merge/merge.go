@@ -28,6 +28,8 @@ func NewWatchSet(ctx context.Context, f *file.File) *WatchSet {
 // This is supposed to run in parallel to watch on the
 // WatchSet, and perform the merge job whenever deemed
 // necessary.
+//
+// This function opens all non-operational files,
 func (w *WatchSet) RunJob() {
 	for {
 		select {
