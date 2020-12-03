@@ -44,7 +44,7 @@ type KeyValueStore struct {
 var _ (Database) = (*KeyValueStore)(nil)
 
 // NewKeyValueStore retunrs a new instance of a KV store.
-func NewKeyValueStore(ctx context.Context) (*KeyValueStore, error) {
+func NewKeyValueStore(ctx context.Context, index indexer.Indexer) (*KeyValueStore, error) {
 	f, err := file.NewFile()
 	if err != nil {
 		return nil, err
@@ -56,7 +56,6 @@ func NewKeyValueStore(ctx context.Context) (*KeyValueStore, error) {
 	ws := merge.NewWatchSet(ctx, f)
 	go ws.RunJob()
 
-	index := indexer.NewMapIndexer()
 	return &KeyValueStore{
 		ctx:           ctx,
 		f:             f,
