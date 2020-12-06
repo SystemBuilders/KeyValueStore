@@ -94,7 +94,6 @@ func (kv *KeyValueStore) Query(key interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return data, nil
 }
 
@@ -111,15 +110,19 @@ func (kv *KeyValueStore) indexLog(key interface{}, data []byte, segment int) {
 	if kv.currSegment != segment {
 		offset = 0
 		kv.prevObjLength = 0
+		kv.currSegment = segment
 	} else {
 		offset = kv.prevObjLength
 	}
 
-	kv.index.Store(key, indexer.ObjectLocation{
-		Offset:  offset,
-		Size:    len(data),
-		Segment: segment,
-	})
+	kv.index.Store(
+		key,
+		indexer.ObjectLocation{
+			Offset:  offset,
+			Size:    len(data),
+			Segment: segment,
+		},
+	)
 
 	kv.prevObjLength += len(data)
 }

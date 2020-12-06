@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -40,4 +41,11 @@ func (m *Map) Query(key interface{}) ObjectLocation {
 	m.l.Lock()
 	defer m.l.Unlock()
 	return m.index[key]
+}
+
+// Print prints the indexer map.
+func (m *Map) Print() {
+	m.l.Lock()
+	fmt.Println(m.index)
+	m.l.Unlock()
 }

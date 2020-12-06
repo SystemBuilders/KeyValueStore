@@ -65,11 +65,12 @@ func (f *File) Append(s string) (int, error) {
 		f.MergeNeeded = true
 	}
 
-	file := f.fs[activeFileIndex]
+	file := f.fs[f.activeFileIndex]
 	_, err = file.WriteString(s)
 	if err != nil {
 		return -1, err
 	}
+
 	return f.activeFileIndex, err
 }
 
@@ -93,8 +94,6 @@ func (f *File) ReadAt(loc indexer.ObjectLocation) (string, error) {
 
 // seekToActiveFileSegment returns the current active file's
 // index in the list being maintained.
-// TODO: Figure out a way to maintain a pointer to the
-// active file.
 func (f *File) seekToActiveFileSegment() int {
 	return f.activeFileIndex
 }

@@ -44,7 +44,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key2", "value2")
+	err = kv.Insert("key5", "value2")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -54,17 +54,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key4", "value1")
+	err = kv.Insert("key2", "value1")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key5", "value2")
+	err = kv.Insert("key0", "value2")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	data, err := kv.Query("key4")
+	data, err := kv.Query("key3")
 	if err != nil {
 		log.Fatal(err)
 	}

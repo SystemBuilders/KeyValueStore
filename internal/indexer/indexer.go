@@ -8,6 +8,7 @@ package indexer
 type Indexer interface {
 	Store(interface{}, ObjectLocation)
 	Query(interface{}) ObjectLocation
+	Print()
 }
 
 // ObjectLocation desribes the precise location of an Object
