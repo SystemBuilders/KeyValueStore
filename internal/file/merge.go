@@ -1,23 +1,29 @@
-package merge
+package file
 
 import (
 	"context"
-
-	"github.com/SystemBuilders/KeyValueStore/internal/file"
+	"os"
+	"sync"
 )
 
 // WatchSet is a collection of objects that a merge job
 // needs to keep an eye on and use.
 type WatchSet struct {
 	ctx context.Context
-	f   *file.File
+	f   *File
+	mu  *sync.Mutex
 }
 
 // NewWatchSet returns a new WatchSet.
-func NewWatchSet(ctx context.Context, f *file.File) *WatchSet {
+func NewWatchSet(
+	ctx context.Context,
+	f *File,
+	mu *sync.Mutex,
+) *WatchSet {
 	return &WatchSet{
 		ctx: ctx,
 		f:   f,
+		mu:  mu,
 	}
 }
 
@@ -37,11 +43,24 @@ func (w *WatchSet) RunJob() {
 			return
 		default:
 			if w.f.MergeNeeded {
+				// w.mu.Lock()
 				// TODO.
-				// merge the two files by creating a new file.
+				// merge the multiple files by creating a new file.
 				// Discard the old files.
-				w.f.MergeNeeded = false
+				// next, quit :=
+
+				// _ = w.f.createNewFileSegment()
+				// openFile := make([]*os.File, w.f.activeFileIndex)
+				// copy(openFile, w.f.fs[:w.f.activeFileIndex])
+
+				// w.f.MergeNeeded = false
 			}
 		}
 	}
+}
+
+// readNext is a merging helper function that reads the next
+// object in the physical file that makes up the kv store.
+func readNext(f *os.File) (string, error) {
+	return "", nil
 }

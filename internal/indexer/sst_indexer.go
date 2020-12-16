@@ -73,7 +73,7 @@ func (sst *SSTable) Store(key interface{}, loc ObjectLocation) {
 // objects in the SSTable.
 // It searches backwards in the segments to find the most recently
 // appended value in the store.
-func (sst *SSTable) Query(key interface{}) ObjectLocation {
+func (sst *SSTable) Query(key interface{}) (objLoc ObjectLocation) {
 	currSegment := sst.currSegment
 	for {
 		val, ok := binarySearch(sst.list[currSegment], key)
@@ -82,10 +82,12 @@ func (sst *SSTable) Query(key interface{}) ObjectLocation {
 				currSegment--
 			} else {
 				// Object not found.
-				return ObjectLocation{}
+				objLoc = ObjectLocation{}
+				return
 			}
 		} else {
-			return val
+			objLoc = val
+			return
 		}
 	}
 }

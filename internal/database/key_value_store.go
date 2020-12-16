@@ -3,9 +3,9 @@ package database
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
-	"github.com/SystemBuilders/KeyValueStore/internal/merge"
 
 	"github.com/SystemBuilders/KeyValueStore/internal/file"
 )
@@ -34,66 +34,64 @@ type KeyValueStore struct {
 	// store is indexed. This can be used to implement
 	// differet indexing methods for different performance needs.
 	index indexer.Indexer
-	// prevObjLength specifies the length of the last
-	// appended object. This is used to index the next
-	// log.
-	prevObjLength int
-	currSegment   int
+
+	mu *sync.Mutex
 }
 
 var _ (Database) = (*KeyValueStore)(nil)
 
 // NewKeyValueStore retunrs a new instance of a KV store.
 func NewKeyValueStore(ctx context.Context, index indexer.Indexer) (*KeyValueStore, error) {
-	f, err := file.NewFile()
+
+	mu := sync.Mutex{}
+	f, err := file.NewFile(ctx, &mu)
 	if err != nil {
 		return nil, err
 	}
 
-	// A new WatchSet is created and set to run in
-	// parallel to merge the segments of files whenever
-	// necessary.
-	ws := merge.NewWatchSet(ctx, f)
-	go ws.RunJob()
+	kvStore := &KeyValueStore{
+		ctx:   ctx,
+		f:     f,
+		index: index,
 
-	return &KeyValueStore{
-		ctx:           ctx,
-		f:             f,
-		index:         index,
-		prevObjLength: 0,
-		currSegment:   -1,
-	}, nil
+		mu: &mu,
+	}
+
+	return kvStore, nil
 }
 
 // Insert appends the given key and value as an Object to the file.
+//
+// Insert writes the data to the file, gets the location of the object
+// and finally indexes it into the provided indexer.
 func (kv *KeyValueStore) Insert(key, value interface{}) error {
+	kv.mu.Lock()
 	obj := NewObject(key, value)
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}
 
-	segment, err := kv.f.Append(string(data))
+	objLoc, err := kv.f.Append(string(data))
 	if err != nil {
 		return err
 	}
 
-	if kv.currSegment == -1 {
-		kv.currSegment = segment
-	}
-
-	kv.indexLog(key, data, segment)
+	kv.indexLog(key, objLoc)
+	kv.mu.Unlock()
 	return nil
 }
 
 // Query returns the last appended Object type from the file, or
 // the encountered error.
 func (kv *KeyValueStore) Query(key interface{}) (interface{}, error) {
+	kv.mu.Lock()
 	logIndex := kv.index.Query(key)
 	data, err := kv.f.ReadAt(logIndex)
 	if err != nil {
 		return nil, err
 	}
+	kv.mu.Unlock()
 	return data, nil
 }
 
@@ -103,26 +101,9 @@ func (kv *KeyValueStore) Delete(key interface{}) error {
 }
 
 // indexLog indexes the log that was appended to the file.
-func (kv *KeyValueStore) indexLog(key interface{}, data []byte, segment int) {
-	var offset int
-	// If this object was appended to a new segment,
-	// its offset is zero.
-	if kv.currSegment != segment {
-		offset = 0
-		kv.prevObjLength = 0
-		kv.currSegment = segment
-	} else {
-		offset = kv.prevObjLength
-	}
-
+func (kv *KeyValueStore) indexLog(key interface{}, objLoc indexer.ObjectLocation) {
 	kv.index.Store(
 		key,
-		indexer.ObjectLocation{
-			Offset:  offset,
-			Size:    len(data),
-			Segment: segment,
-		},
+		objLoc,
 	)
-
-	kv.prevObjLength += len(data)
 }

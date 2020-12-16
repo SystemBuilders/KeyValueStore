@@ -6,8 +6,14 @@ package indexer
 // index the data in the key value store.
 // Multiple indexers can be maintained too.
 type Indexer interface {
+	// Store lets the user to index a particular key
+	// with the given ObjectLocation in the indexer.
 	Store(interface{}, ObjectLocation)
+	// Query allows the user to query the indexer.
+	// Based on the QueryType parameter, data can be
+	// queried in multiple ways.
 	Query(interface{}) ObjectLocation
+	// Print prints the indexer in an explicit manner.
 	Print()
 }
 
@@ -22,3 +28,13 @@ type ObjectLocation struct {
 	// segmented for a much faster and scalable approach.
 	Segment int
 }
+
+// QueryType allows to query the indexer in a desired manner.
+type QueryType int
+
+// Describes the different Query types.
+const (
+	QueryRandom QueryType = iota
+	QueryLeast
+	QueryHighest
+)

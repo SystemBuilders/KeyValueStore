@@ -1,24 +1,37 @@
 package file
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
 )
 
-// MaxFileSize signifies the max file size accepted
-// by the key-value store.
-var MaxFileSize int64 = 10
+var (
+	// maxFileSize signifies the max file size accepted
+	// by the key-value store.
+	maxFileSize int64 = 100
+	// defaultDelimiter is the delimiter set as default for
+	// writing to the file.
+	defaultDelimter string = "\\o/"
+)
 
 // File is an abstraction over the os.File package.
 // This enables handling multiple files that may be carrying the
 // data of the KV store using a single struct.
 type File struct {
-	fName           []string
-	fs              []*os.File
-	activeFileIndex int
+	fName []string
+	fs    []*os.File
+
+	// prevObjLength specifies the length of the last
+	// appended object. This is used to index the next
+	// log.
+	prevObjLength int
+	currSegment   int
 
 	// MergeNeeded signifies whether there exists
 	// more than one file segment and a merge is needed.
@@ -26,16 +39,23 @@ type File struct {
 }
 
 // NewFile returns a new instance of File.
-func NewFile() (*File, error) {
+func NewFile(ctx context.Context, mu *sync.Mutex) (*File, error) {
 
 	file := &File{
-		fs:              []*os.File{},
-		fName:           []string{},
-		activeFileIndex: 0,
-		MergeNeeded:     false,
+		fs:            []*os.File{},
+		fName:         []string{},
+		prevObjLength: 0,
+		currSegment:   0,
+		MergeNeeded:   false,
 	}
 
-	err := createNewFileSegment(file)
+	// A new WatchSet is created and set to run in
+	// parallel to merge the segments of files whenever
+	// necessary.
+	ws := NewWatchSet(ctx, file, mu)
+	go ws.RunJob()
+
+	err := file.createNewFileSegment()
 	if err != nil {
 		return nil, err
 	}
@@ -44,34 +64,61 @@ func NewFile() (*File, error) {
 }
 
 // Append appends the given string to the end of the file.
-// It returns the segment of the file that the object was
-// appended to, which helps the indexer to increase precision.
-func (f *File) Append(s string) (int, error) {
-	activeFileIndex := f.seekToActiveFileSegment()
+//
+// Append returns the precise location of the object so
+// that it can be indexed - includes the offset of the data
+// in the file, the size of the data and the segment of the append.
+func (f *File) Append(s string) (indexer.ObjectLocation, error) {
 
-	info, err := os.Stat(f.fName[activeFileIndex])
+	s += defaultDelimter
+	activeSegment := f.seekToActiveFileSegment()
+
+	info, err := os.Stat(f.fName[activeSegment])
 	if err != nil {
-		return -1, err
+		return indexer.ObjectLocation{}, err
 	}
 
 	// If a file segment exceeds a known limit, create a
 	// new file segment, and do some book-keeping.
-	if info.Size() > MaxFileSize {
-		err = createNewFileSegment(f)
+	if info.Size() > maxFileSize {
+		fmt.Println(info.Size())
+		err = f.createNewFileSegment()
 		if err != nil {
-			return -1, err
+			return indexer.ObjectLocation{}, err
 		}
-		f.activeFileIndex++
-		f.MergeNeeded = true
+		activeSegment++
+
+		// Magic.
+		if len(f.fs) > 5 {
+			f.MergeNeeded = true
+		}
 	}
 
-	file := f.fs[f.activeFileIndex]
+	// Write to the active segment.
+	file := f.fs[activeSegment]
 	_, err = file.WriteString(s)
 	if err != nil {
-		return -1, err
+		return indexer.ObjectLocation{}, err
 	}
 
-	return f.activeFileIndex, err
+	var offset int
+	// If this object was appended to a new segment,
+	// its offset is zero.
+	if activeSegment != f.currSegment {
+		offset = 0
+		f.prevObjLength = 0
+		f.currSegment = activeSegment
+	} else {
+		offset = f.prevObjLength
+	}
+
+	f.prevObjLength += len(s)
+
+	return indexer.ObjectLocation{
+		Offset:  offset,
+		Size:    len(s),
+		Segment: f.currSegment,
+	}, nil
 }
 
 // ReadAt reads the file at the given offset and for the
@@ -95,20 +142,22 @@ func (f *File) ReadAt(loc indexer.ObjectLocation) (string, error) {
 // seekToActiveFileSegment returns the current active file's
 // index in the list being maintained.
 func (f *File) seekToActiveFileSegment() int {
-	return f.activeFileIndex
+	return f.currSegment
 }
 
 // createNewFileSegment needs the parent File structure as an
 // argument, creates and appends the new file-segment to the parent.
-func createNewFileSegment(file *File) error {
+//
+// This doesn't increase the activeFileIndex count.
+func (f *File) createNewFileSegment() error {
 	fName := time.Now().String()
-	f, err := os.OpenFile(fName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	file, err := os.OpenFile(fName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return err
 	}
 
-	file.fs = append(file.fs, f)
-	file.fName = append(file.fName, fName)
+	f.fs = append(f.fs, file)
+	f.fName = append(f.fName, fName)
 
 	return nil
 }
