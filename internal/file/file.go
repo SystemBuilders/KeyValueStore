@@ -39,7 +39,7 @@ type File struct {
 }
 
 // NewFile returns a new instance of File.
-func NewFile(ctx context.Context, mu *sync.Mutex) (*File, error) {
+func NewFile(ctx context.Context, mu *sync.Mutex, index indexer.Indexer) (*File, error) {
 
 	file := &File{
 		fs:            []*os.File{},
@@ -52,7 +52,7 @@ func NewFile(ctx context.Context, mu *sync.Mutex) (*File, error) {
 	// A new WatchSet is created and set to run in
 	// parallel to merge the segments of files whenever
 	// necessary.
-	ws := NewWatchSet(ctx, file, mu)
+	ws := NewWatchSet(ctx, file, index, mu)
 	go ws.RunJob()
 
 	err := file.createNewFileSegment()
@@ -73,7 +73,15 @@ func (f *File) Append(s string) (indexer.ObjectLocation, error) {
 	s += defaultDelimter
 	activeSegment := f.seekToActiveFileSegment()
 
-	info, err := os.Stat(f.fName[activeSegment])
+	return f.appendAtSegment(s, activeSegment)
+}
+
+// appendAtSegment appends a string at a particular segment.
+// This is just used by the merging functionality and is not recommended
+// for external use.
+func (f *File) appendAtSegment(s string, segment int) (indexer.ObjectLocation, error) {
+
+	info, err := os.Stat(f.fName[segment])
 	if err != nil {
 		return indexer.ObjectLocation{}, err
 	}
@@ -81,12 +89,11 @@ func (f *File) Append(s string) (indexer.ObjectLocation, error) {
 	// If a file segment exceeds a known limit, create a
 	// new file segment, and do some book-keeping.
 	if info.Size() > maxFileSize {
-		fmt.Println(info.Size())
 		err = f.createNewFileSegment()
 		if err != nil {
 			return indexer.ObjectLocation{}, err
 		}
-		activeSegment++
+		segment++
 
 		// Magic.
 		if len(f.fs) > 5 {
@@ -95,7 +102,7 @@ func (f *File) Append(s string) (indexer.ObjectLocation, error) {
 	}
 
 	// Write to the active segment.
-	file := f.fs[activeSegment]
+	file := f.fs[segment]
 	_, err = file.WriteString(s)
 	if err != nil {
 		return indexer.ObjectLocation{}, err
@@ -104,10 +111,10 @@ func (f *File) Append(s string) (indexer.ObjectLocation, error) {
 	var offset int
 	// If this object was appended to a new segment,
 	// its offset is zero.
-	if activeSegment != f.currSegment {
+	if segment != f.currSegment {
 		offset = 0
 		f.prevObjLength = 0
-		f.currSegment = activeSegment
+		f.currSegment = segment
 	} else {
 		offset = f.prevObjLength
 	}
@@ -160,4 +167,31 @@ func (f *File) createNewFileSegment() error {
 	f.fName = append(f.fName, fName)
 
 	return nil
+}
+
+// deleteFilesTillIndex deletes all files including the file at index.
+//
+// Sample usage -
+// Initial slice: [1,2,3,4,5,6]
+// Desired slice: [4,5,6]
+// Function call: deleteFilesTillIndex(3)
+// First 3 indexes are deleted.
+func (f *File) deleteFilesTillIndex(index int) {
+	fmt.Println(index)
+	for i := 0; i <= index; i++ {
+		releaseFile(f.fName[0])
+	}
+
+	files := make([]*os.File, len(f.fs)-index-1)
+	fileNames := make([]string, len(f.fName)-index-1)
+	copy(files, f.fs[index:])
+	copy(fileNames, f.fName[index:])
+
+	f.fs = files
+	f.fName = fileNames
+}
+
+func releaseFile(f string) {
+	fmt.Printf("deleting: %s\n", f)
+	os.Remove(f)
 }

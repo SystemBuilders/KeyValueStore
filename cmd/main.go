@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
 
@@ -15,7 +16,7 @@ func main() {
 	ctx := context.Background()
 
 	var (
-		mapIndexerFlag = flag.Bool("map", false, "-map=true")
+		mapIndexerFlag = flag.Bool("map", false, "--map=true")
 		sstIndexerFlag = flag.Bool("sst", false, "--sst=true")
 	)
 
@@ -29,6 +30,8 @@ func main() {
 		idxr = indexer.NewSSTableIndexer()
 	}
 
+	idxr = indexer.NewSSTableIndexer()
+
 	kv, err := database.NewKeyValueStore(ctx, idxr)
 	if err != nil {
 		log.Fatal(err)
@@ -39,27 +42,27 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key1", "value1")
+	err = kv.Insert("key", "value1")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key5", "value2")
+	err = kv.Insert("key", "value2")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key3", "value")
+	err = kv.Insert("key", "value")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key2", "value1")
+	err = kv.Insert("key", "value1")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key0", "value2")
+	err = kv.Insert("key", "value2")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -69,22 +72,22 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key1", "value1new")
+	err = kv.Insert("key", "value1new")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key5", "value2new")
+	err = kv.Insert("key", "value2new")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key3", "valuenew")
+	err = kv.Insert("key", "valuenew")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key2", "value1new")
+	err = kv.Insert("key", "value1new")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -129,5 +132,6 @@ func main() {
 		log.Fatal(err)
 	}
 
+	time.Sleep(50000 * time.Second)
 	fmt.Println(data)
 }
