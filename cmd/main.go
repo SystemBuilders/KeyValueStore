@@ -102,27 +102,27 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key1", "value1newer")
+	err = kv.Insert("key", "value1newer")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key5", "value2newer")
+	err = kv.Insert("key", "value2newer")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key3", "valuenewer")
+	err = kv.Insert("key", "valuenewer")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key2", "value1newer")
+	err = kv.Insert("key", "value1newer")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = kv.Insert("key0", "value2newer")
+	err = kv.Insert("key", "value2newer")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	// TODO: Merging same keys issue to be solved.
 	time.Sleep(50000 * time.Second)
 	fmt.Println(data)
 }
