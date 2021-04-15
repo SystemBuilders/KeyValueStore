@@ -6,6 +6,8 @@ package indexer
 // index the data in the key value store.
 // Multiple indexers can be maintained too.
 type Indexer interface {
+	// Type returns the type of the indexer.
+	Type() string
 	// Store lets the user to index a particular key
 	// with the given ObjectLocation in the indexer.
 	Store(interface{}, ObjectLocation)
@@ -17,7 +19,7 @@ type Indexer interface {
 	Print()
 }
 
-// ObjectLocation desribes the precise location of an Object
+// ObjectLocation describes the precise location of an Object
 // in the database file.
 type ObjectLocation struct {
 	Offset int

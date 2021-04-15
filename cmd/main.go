@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/SystemBuilders/KeyValueStore/internal/indexer/map"
+	"github.com/SystemBuilders/KeyValueStore/internal/indexer/sst"
 	"log"
 	"time"
 
@@ -13,24 +15,34 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
 
 	var (
+		appendOnlyStorageFlag = flag.Bool("appendOnlyStorage",false, "--appendOnlyStorage=true")
+		sstStorageFlag = flag.Bool("sstStorage", false, "--sstStorage=true")
 		mapIndexerFlag = flag.Bool("map", false, "--map=true")
 		sstIndexerFlag = flag.Bool("sst", false, "--sst=true")
 	)
 
 	flag.Parse()
 
+
+	ctx := context.Background()
+
+	if *appendOnlyStorageFlag {
+		ctx = context.WithValue(ctx,"storage","append")
+	} else if *sstStorageFlag {
+		ctx = context.WithValue(ctx,"storage","sst")
+	}
+
 	var idxr indexer.Indexer
 
 	if *mapIndexerFlag {
-		idxr = indexer.NewMapIndexer()
+		idxr = _map.NewMapIndexer()
 	} else if *sstIndexerFlag {
-		idxr = indexer.NewSSTableIndexer()
+		idxr = sst.NewSSTableIndexer()
 	}
 
-	idxr = indexer.NewSSTableIndexer()
+	idxr = sst.NewSSTableIndexer()
 
 	kv, err := database.NewKeyValueStore(ctx, idxr)
 	if err != nil {

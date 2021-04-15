@@ -68,7 +68,7 @@ func NewFile(ctx context.Context, mu *sync.Mutex, index indexer.Indexer) (*File,
 // Append returns the precise location of the object so
 // that it can be indexed - includes the offset of the data
 // in the file, the size of the data and the segment of the append.
-func (f *File) Append(s string) (indexer.ObjectLocation, error) {
+func (f *File) Append(ctx context.Context, s string) (indexer.ObjectLocation, error) {
 
 	s += defaultDelimter
 	activeSegment := f.seekToActiveFileSegment()

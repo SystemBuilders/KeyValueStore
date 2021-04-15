@@ -1,6 +1,10 @@
-package indexer
+package sst
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
+	tree2 "github.com/SystemBuilders/KeyValueStore/internal/indexer/sst/tree"
+)
 
 // SSTable stands for Sorted Segment Table.
 // An SSTable is a collection of a number of file
@@ -8,6 +12,8 @@ import "fmt"
 // in sorted order by the key of the object.
 type SSTable struct {
 	list        [][]SSTableObject
+
+	tree        tree2.Tree
 	currSegment int
 }
 
@@ -15,10 +21,10 @@ type SSTable struct {
 // to be indexed and the object location in the segment.
 type SSTableObject struct {
 	key interface{}
-	loc ObjectLocation
+	loc indexer.ObjectLocation
 }
 
-var _ (Indexer) = (*SSTable)(nil)
+var _ (indexer.Indexer) = (*SSTable)(nil)
 
 // NewSSTableIndexer creates a new SSTable indexer.
 func NewSSTableIndexer() *SSTable {
@@ -27,11 +33,16 @@ func NewSSTableIndexer() *SSTable {
 	}
 }
 
+// Type returns the type of the indexer.
+func (sst *SSTable) Type() string {
+	return "sst"
+}
+
 // Store inserts into the sorted list of objects.
 //
 // Iterate over the list until the first object bigger than the
 // inserting element is found and insert at that position.
-func (sst *SSTable) Store(key interface{}, loc ObjectLocation) {
+func (sst *SSTable) Store(key interface{}, loc indexer.ObjectLocation) {
 	sstObject := SSTableObject{key, loc}
 	if sst.currSegment < loc.Segment {
 		var segmentList []SSTableObject
@@ -73,7 +84,7 @@ func (sst *SSTable) Store(key interface{}, loc ObjectLocation) {
 // objects in the SSTable.
 // It searches backwards in the segments to find the most recently
 // appended value in the store.
-func (sst *SSTable) Query(key interface{}) (objLoc ObjectLocation) {
+func (sst *SSTable) Query(key interface{}) (objLoc indexer.ObjectLocation) {
 	currSegment := sst.currSegment
 	for {
 		val, ok := binarySearch(sst.list[currSegment], key)
@@ -82,7 +93,7 @@ func (sst *SSTable) Query(key interface{}) (objLoc ObjectLocation) {
 				currSegment--
 			} else {
 				// Object not found.
-				objLoc = ObjectLocation{}
+				objLoc = indexer.ObjectLocation{}
 				return
 			}
 		} else {
@@ -118,14 +129,14 @@ func insertAt(i int, key SSTableObject, list []SSTableObject) []SSTableObject {
 // binarySearch does a simple binary search of the key in
 // the list. The second argument returns false if the object
 // was not found in the list.
-func binarySearch(list []SSTableObject, key interface{}) (ObjectLocation, bool) {
+func binarySearch(list []SSTableObject, key interface{}) (indexer.ObjectLocation, bool) {
 	lenList := len(list)
 	if lenList == 0 {
-		return ObjectLocation{}, false
+		return indexer.ObjectLocation{}, false
 	}
 	if lenList == 1 {
 		if key.(string) != list[0].key.(string) {
-			return ObjectLocation{}, false
+			return indexer.ObjectLocation{}, false
 		}
 		return list[0].loc, true
 	}
@@ -145,5 +156,5 @@ func binarySearch(list []SSTableObject, key interface{}) (ObjectLocation, bool) 
 			high = pivot - 1
 		}
 	}
-	return ObjectLocation{}, false
+	return indexer.ObjectLocation{}, false
 }

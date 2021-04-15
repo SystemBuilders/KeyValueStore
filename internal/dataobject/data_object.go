@@ -2,6 +2,7 @@ package dataobject
 
 import (
 	"encoding/json"
+	"github.com/SystemBuilders/KeyValueStore/internal/database"
 )
 
 // Object describes a key-value pair in the store.
@@ -11,7 +12,7 @@ type Object struct {
 }
 
 // NewObject returns a new instance of an object.
-func NewObject(key, value interface{}) Object {
+func NewObject(key database.Item, value interface{}) Object {
 	return Object{
 		Key:   key,
 		Value: value,

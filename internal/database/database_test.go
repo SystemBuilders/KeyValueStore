@@ -3,16 +3,16 @@ package database
 import (
 	"context"
 	"fmt"
+	"github.com/SystemBuilders/KeyValueStore/internal/indexer/map"
+	"github.com/SystemBuilders/KeyValueStore/internal/indexer/sst"
 	"log"
 	"strconv"
 	"testing"
-
-	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
 )
 
 func TestAppend(t *testing.T) {
 	ctx := context.Background()
-	idxr := indexer.NewMapIndexer()
+	idxr := _map.NewMapIndexer()
 	kv, err := NewKeyValueStore(ctx, idxr)
 	if err != nil {
 		log.Fatal(err)
@@ -41,7 +41,7 @@ func TestAppend(t *testing.T) {
 }
 
 func BenchmarkMapIndexer(b *testing.B) {
-	idxr := indexer.NewMapIndexer()
+	idxr := _map.NewMapIndexer()
 	ctx := context.Background()
 	kv, err := NewKeyValueStore(ctx, idxr)
 	if err != nil {
@@ -85,7 +85,7 @@ func BenchmarkMapIndexer(b *testing.B) {
 }
 
 func BenchmarkSSTIndexer(b *testing.B) {
-	idxr := indexer.NewSSTableIndexer()
+	idxr := sst.NewSSTableIndexer()
 	ctx := context.Background()
 	kv, err := NewKeyValueStore(ctx, idxr)
 	if err != nil {
