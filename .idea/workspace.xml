@@ -21,16 +21,12 @@
   <component name="ChangeListManager">
     <list default="true" id="9ddcfc9b-fff9-4fe3-88ae-5d591fdd71d6" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/database/database.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/database/database.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/database/database_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/database/database_test.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/database/key_value_store.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/database/key_value_store.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/dataobject/data_object.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/dataobject/data_object.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/file/file.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/file/file.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/indexer/indexer.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/indexer/indexer.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/indexer/map_indexer.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/indexer/map/map_indexer.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/indexer/sst_indexer.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/indexer/sst/sst_indexer.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/indexer/sst/tree/avl_node_value.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/indexer/sst/tree/avl_tree.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/indexer/sst/tree/avl_tree.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/indexer/sst/tree/avl_tree_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/indexer/sst/tree/avl_tree_test.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -160,7 +156,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/internal/indexer/sst/tree/avl_tree_test.go</url>
-          <line>27</line>
+          <line>36</line>
           <option name="timeStamp" value="41" />
         </line-breakpoint>
       </breakpoints>

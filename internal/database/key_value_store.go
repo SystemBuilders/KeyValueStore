@@ -59,7 +59,7 @@ func NewKeyValueStore(ctx context.Context, index indexer.Indexer) (*KeyValueStor
 //
 // Insert writes the data to the file, gets the location of the object
 // and finally indexes it into the provided indexer.
-func (kv *KeyValueStore) Insert(key Item, value interface{}) error {
+func (kv *KeyValueStore) Insert(key []byte, value interface{}) error {
 	obj := dataobject.NewObject(key, value)
 	data, err := json.Marshal(obj)
 	if err != nil {
@@ -73,7 +73,7 @@ func (kv *KeyValueStore) Insert(key Item, value interface{}) error {
 // the encountered error.
 // Query uses the indexed value to get the object location and
 // uses the file API to query the data.
-func (kv *KeyValueStore) Query(key Item) (interface{}, error) {
+func (kv *KeyValueStore) Query(key []byte) (interface{}, error) {
 	kv.mu.Lock()
 	logIndex := kv.index.Query(key)
 	data, err := kv.f.ReadAt(logIndex)
@@ -85,19 +85,22 @@ func (kv *KeyValueStore) Query(key Item) (interface{}, error) {
 }
 
 // Delete deletes all entries of the
-func (kv *KeyValueStore) Delete(key Item) error {
+func (kv *KeyValueStore) Delete(key []byte) error {
 	return nil
 }
 
 // indexLog indexes the log that was appended to the file.
-func (kv *KeyValueStore) indexLog(key Item, objLoc indexer.ObjectLocation) {
+func (kv *KeyValueStore) indexLog(key []byte, objLoc indexer.ObjectLocation) {
 	kv.index.Store(
 		key,
 		objLoc,
 	)
 }
 
-func (kv *KeyValueStore) insert(key Item, data string) error {
+// insert is a storage and indexer aware inserting method that
+// stores the key, value pair in the storage engine and indexes
+// into the appropriate indexer.
+func (kv *KeyValueStore) insert(key []byte, data string) error {
 
 	switch kv.ctx.Value("storage") {
 	case "append":

@@ -1,6 +1,10 @@
 package tree
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+	"github.com/SystemBuilders/KeyValueStore/internal/database"
+)
 
 // AVLNode represents a single node of the
 // AVL Tree. It has the left and right branches
@@ -8,7 +12,8 @@ import "fmt"
 // the height of the node from the root of the tree,
 // assuming the root is at height zero.
 type AVLNode struct {
-	Value AVLNodeValue
+	Value []byte
+	InterfaceValue interface{}
 	Left, Right, Parent *AVLNode
 	Height int
 }
@@ -30,9 +35,13 @@ var _ Tree = (*AVLTree)(nil)
 // newAVLNode returns a new AVLNode with the
 // given value and a zero height. It's left and
 // right node are nil.
-func newAVLNode(val AVLNodeValue) *AVLNode {
+func newAVLNode(val interface{}) *AVLNode {
+
+	byteData := database.GetBytesFromInterface(val)
+
 	return &AVLNode{
-		Value: val,
+		Value: byteData,
+		InterfaceValue: val,
 		Left: nil,
 		Right: nil,
 		Parent: nil,
@@ -52,15 +61,15 @@ func NewAVLTree() *AVLTree {
 
 func (avl *AVLTree) Insert(val interface{}) error {
 
-	avlNodeVal := NewAVLNodeValue(val)
 	if avl.headNode == nil {
-		avl.headNode = newAVLNode(avlNodeVal)
+		avl.headNode = newAVLNode(val)
 		avl.headNode.Height = 0
 		return nil
 	}
 
 	node := avl.headNode
-	node.insert(avlNodeVal)
+	newNode := newAVLNode(val)
+	node.insert(newNode)
 	return nil
 }
 
@@ -69,10 +78,7 @@ func (avl *AVLTree) Delete(val interface{}) error {
 }
 
 func (avl *AVLTree) Query(val interface{}) (bool,error) {
-	if avl.headNode.Value.compare(NewAVLNodeValue(val),Equal) {
-		return true, nil
-	}
-	return false, ErrNodeDoesntExist
+	return true, nil
 }
 
 // Print prints the tree in a level order manner.
@@ -92,8 +98,8 @@ func (avl *AVLTree) Print() {
 		}
 
 		// Print the node.
-		fmt.Println(node.Value)
-		fmt.Println(" ")
+		fmt.Printf("%d", node.InterfaceValue)
+		fmt.Printf(", ")
 
 		// Append the successors if they exist.
 		if node.Left != nil {
@@ -103,27 +109,41 @@ func (avl *AVLTree) Print() {
 			avl.printQueue = append(avl.printQueue, node.Right)
 		}
 	}
+	fmt.Println("")
 }
 
-func (node *AVLNode) insert(nodeVal AVLNodeValue) (*AVLNode, error) {
+// insert has lesser control than Insert and can only insert on
+// an existing tree.
+//
+// Inserting is a simple compare and insert mechanism that obeys
+// the binary tree insertion style. This also computes the height
+// of the node inserted.
+// The second part of inserting is the balancing of the tree based
+// on the AVL tree rules. In-depth documentation exists in the
+// respective balancing functions.
+func (node *AVLNode) insert(currNode *AVLNode) (*AVLNode, error) {
 	if node == nil {
-		node = newAVLNode(nodeVal)
+		node = currNode
 		return node, nil
 	}
 
-	if node.Value.compare(nodeVal, GreaterThan) {
-		newNode, err := node.Right.insert(nodeVal)
+	// If incoming value greater than current
+	// node value.
+	if bytes.Compare(node.Value, currNode.Value) < 0 {
+		newNode, err := node.Right.insert(currNode)
 		if node.Right == nil {
 			node.Right = newNode
 			newNode.Parent = node
+			newNode.Height = newNode.Parent.Height + 1
 			return newNode, err
 		}
 		return node, nil
-	}else {
-		newNode, err := node.Left.insert(nodeVal)
+	} else {
+		newNode, err := node.Left.insert(currNode)
 		if node.Left == nil {
 			node.Left = newNode
 			newNode.Parent = node
+			newNode.Height = newNode.Parent.Height + 1
 			return newNode, err
 		}
 		return node, nil

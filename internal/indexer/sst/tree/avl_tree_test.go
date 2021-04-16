@@ -25,5 +25,14 @@ func TestAVLTree_Insert(t *testing.T) {
 	err = avlTree.Insert(-1)
 	assert.Nil(err)
 
+	err = avlTree.Insert(-2)
+	assert.Nil(err)
+
+	err = avlTree.Insert(4)
+	assert.Nil(err)
+
+	err = avlTree.Insert(0)
+	assert.Nil(err)
+
 	avlTree.Print()
 }
