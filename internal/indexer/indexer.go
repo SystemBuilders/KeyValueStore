@@ -22,8 +22,13 @@ type Indexer interface {
 // ObjectLocation describes the precise location of an Object
 // in the database file.
 type ObjectLocation struct {
+	// Offset describes the starting position of this
+	// object from the beginning of the file. This is
+	// the number that is calculated by the APIs written
+	// here and not from any external APIs.
 	Offset int
-	Size   int
+	// Size describes the size of this particular object.
+	Size int
 
 	// Segment describes the segment of the file the object
 	// is a part of. It is presumed that the files are always

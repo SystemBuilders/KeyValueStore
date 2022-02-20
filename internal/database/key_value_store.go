@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/SystemBuilders/KeyValueStore/internal/dataobject"
@@ -16,13 +17,12 @@ type KeyValueStore struct {
 	ctx context.Context
 	// f is the file where the kv store appends structured
 	// logs.
-	f *file.File
+	f file.File
 	// index is the way the file pertaining to the key-value
 	// store is indexed. This can be used to implement
 	// different indexing methods for different performance needs.
 	index indexer.Indexer
-
-	mu *sync.Mutex
+	mu    *sync.Mutex
 }
 
 var _ Database = (*KeyValueStore)(nil)
@@ -30,6 +30,7 @@ var _ Database = (*KeyValueStore)(nil)
 // NewKeyValueStore returns a new instance of a KV store.
 func NewKeyValueStore(ctx context.Context, index indexer.Indexer) (*KeyValueStore, error) {
 
+	// TODO: Not sure what this was intended at, wait.
 	if ctx.Value("storage") == "append" && index.Type() != "map" {
 		return nil, ErrBadIndexerForEngine
 	}
@@ -39,7 +40,7 @@ func NewKeyValueStore(ctx context.Context, index indexer.Indexer) (*KeyValueStor
 	}
 
 	mu := sync.Mutex{}
-	f, err := file.NewFile(ctx, &mu, index)
+	f, err := file.NewFileV1(ctx, &mu, index)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +87,7 @@ func (kv *KeyValueStore) Query(key []byte) (interface{}, error) {
 
 // Delete deletes all entries of the
 func (kv *KeyValueStore) Delete(key []byte) error {
-	return nil
+	return ErrUnsupported
 }
 
 // indexLog indexes the log that was appended to the file.
@@ -114,7 +115,9 @@ func (kv *KeyValueStore) insert(key []byte, data string) error {
 
 		kv.indexLog(key, objLoc)
 	case "sst":
-
+	default:
+		fmt.Println(kv.ctx.Value("storage"))
+		return ErrBadIndexerForEngine
 	}
 
 	return nil
@@ -143,4 +146,7 @@ Changes that'll be made:
    • From time to time, run a merging and compaction process in the background to combine
      segment files and to discard overwritten or deleted values.
 4. Crash recovery - write to an append only log before inserting into the RB/AVL tree, recover later.
+5. Remove the files after usage, just creates a mess.
+6. Fix map indexers first.
+7. have a concrete thought and idea on the datatypes that we will be using. Inserting basically.
 */

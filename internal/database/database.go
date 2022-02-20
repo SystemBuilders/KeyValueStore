@@ -1,6 +1,6 @@
 package database
 
-// Database represents a kev-value store, that stores all the key-value data.
+// Database represents a key-value store, that stores all the key-value data.
 // This allows insertion, querying and deleting of the key-value pairs.
 type Database interface {
 	// Insert allows to insert any key value pair into the database.

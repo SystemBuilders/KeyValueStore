@@ -5,5 +5,7 @@ This project was a motivation from Martin Kleppman's Designing Data Intensive Ap
 
 Design docs coming soon!
 
-
+Some issues:
+1. Map indexer compaction: how do you do the compaction? Copying and they compaction and then replace old with new? How will you copy consistently?
+2. How do merge when the merging files can be in use? How do you update the file segment data to all these?
 Sumukha PK.

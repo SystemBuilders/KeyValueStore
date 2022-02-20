@@ -8,16 +8,15 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
-
 	"github.com/SystemBuilders/KeyValueStore/internal/dataobject"
+	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
 )
 
 // WatchSet is a collection of objects that a merge job
 // needs to keep an eye on and use.
 type WatchSet struct {
 	ctx  context.Context
-	f    *File
+	f    *FileV1
 	mu   *sync.Mutex
 	idxr indexer.Indexer
 }
@@ -25,7 +24,7 @@ type WatchSet struct {
 // NewWatchSet returns a new WatchSet.
 func NewWatchSet(
 	ctx context.Context,
-	f *File,
+	f *FileV1,
 	idxr indexer.Indexer,
 	mu *sync.Mutex,
 ) *WatchSet {
@@ -37,7 +36,7 @@ func NewWatchSet(
 	}
 }
 
-// RunJob runs a job which checks on changes to in
+// RunJob runs a job which checks on changes in
 // the file segments sizes. When the size reaches a
 // threshold, it runs a merge job between the segments.
 //
@@ -68,6 +67,7 @@ func (w *WatchSet) RunJob() {
 			return
 		default:
 			if w.f.MergeNeeded {
+				// TODO: WatchSets lock? Does it even matter? Use KV's lock?
 				w.mu.Lock()
 				w.f.MergeNeeded = false
 
@@ -109,7 +109,7 @@ func (w *WatchSet) RunJob() {
 //
 // It maintains the offset slice passed to it by updating the
 // last read offset on choosing the next element to be returned.
-func getNextElement(f *File, offsets *[]int) (string, error) {
+func getNextElement(f *FileV1, offsets *[]int) (string, error) {
 
 	val, err := readNext(f.fs[0], (*offsets)[0])
 	if err != nil {
@@ -132,7 +132,6 @@ func getNextElement(f *File, offsets *[]int) (string, error) {
 	return val, nil
 }
 
-
 // readNext reads the next object that was stored in the file
 // after the provided offset.
 //
@@ -146,7 +145,7 @@ func readNext(f *os.File, offset int) (string, error) {
 
 	var (
 		stringBuilder strings.Builder
-		readBytes = 0
+		readBytes     = 0
 	)
 	reader := bufio.NewReader(f)
 	for {
@@ -159,7 +158,7 @@ func readNext(f *os.File, offset int) (string, error) {
 			break
 		}
 
-		nextByte := make([]byte,1)
+		nextByte := make([]byte, 1)
 
 		_, err = reader.Read(nextByte)
 
