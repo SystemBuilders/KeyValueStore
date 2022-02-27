@@ -11,22 +11,6 @@ import (
 	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
 )
 
-var (
-	// maxFileSize signifies the max file size accepted
-	// by the key-value store.
-	maxFileSize int64 = 3
-	// defaultDelimiter is the delimiter set as default for
-	// writing to the file.
-	defaultDelimter string = "\\o/"
-	// mergingLimit is the limit of the number of files
-	// tolerable by the system and the threshold where
-	// compaction and merging must occur.
-	//
-	// Currently an arbitrarily set number, this can be
-	// based on speed, RAM size etc.
-	mergingLimit int = 5
-)
-
 // FileV1 implements File.
 //
 // FileV1 is an abstraction over the os.File package.
@@ -58,11 +42,17 @@ type FileV1 struct {
 	// file segments can be determined by any optimisations
 	// needed and has no fixed rule.
 	MergeNeeded bool
+	// fileLock is needed to synchronise the actions on the
+	// above FileV1 data structures.
+	fileLock sync.Mutex
 }
 
 var _ (File) = (*FileV1)(nil)
 
 // NewFileV1 returns a new instance of File.
+//
+// This is deprecated now in view of the new
+// design of File for merging and compaction.
 func NewFileV1(ctx context.Context, mu *sync.Mutex, index indexer.Indexer,
 ) (*FileV1, error) {
 
@@ -72,6 +62,7 @@ func NewFileV1(ctx context.Context, mu *sync.Mutex, index indexer.Indexer,
 		prevObjLength: 0,
 		currSegment:   0,
 		MergeNeeded:   false,
+		fileLock:      sync.Mutex{},
 	}
 
 	// A new WatchSet is created and set to run in
@@ -111,10 +102,12 @@ func (f *FileV1) ReadAt(loc indexer.ObjectLocation) (string, error) {
 	// If the file to be read is not the active segment,
 	// it must be opened before it is read.
 	var file *os.File
+	f.fileLock.Lock()
 	if loc.Segment != f.currSegment {
 		var err error
 		file, err = os.OpenFile(f.fName[loc.Segment], os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 		if err != nil {
+			f.fileLock.Unlock()
 			return "", err
 		}
 	} else {
@@ -125,14 +118,17 @@ func (f *FileV1) ReadAt(loc indexer.ObjectLocation) (string, error) {
 	if err != nil {
 		// The new file may not contain the
 		if err == io.EOF {
-
+			// TODO: ?
 		}
+		f.fileLock.Unlock()
 		return "", err
 	}
 
+	currSegment := f.currSegment
+	f.fileLock.Unlock()
 	// If the file that was read was not the active segment,
 	// close it.
-	if loc.Segment != f.currSegment {
+	if loc.Segment != currSegment {
 		f.closeFileOfSegment(loc.Segment)
 	}
 	return string(b), nil
@@ -142,6 +138,8 @@ func (f *FileV1) ReadAt(loc indexer.ObjectLocation) (string, error) {
 // argument, creates and appends the new file-segment to the parent.
 //
 // This doesn't increase the currSegment count.
+//
+// This function needs to be able to acquire a lock on "fileLock".
 func (f *FileV1) createNewFileSegment() error {
 	fName := time.Now().String()
 	file, err := os.OpenFile(fName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
@@ -149,8 +147,10 @@ func (f *FileV1) createNewFileSegment() error {
 		return err
 	}
 
+	f.fileLock.Lock()
 	f.fs = append(f.fs, file)
 	f.fName = append(f.fName, fName)
+	f.fileLock.Unlock()
 
 	return nil
 }
@@ -158,6 +158,8 @@ func (f *FileV1) createNewFileSegment() error {
 // seekToActiveFileSegment returns the current active file's
 // index in the list being maintained.
 func (f *FileV1) seekToActiveFileSegment() int {
+	f.fileLock.Lock()
+	defer f.fileLock.Unlock()
 	return f.currSegment
 }
 
@@ -181,13 +183,17 @@ func (f *FileV1) appendAtSegment(s string, segment int,
 		}
 		segment++
 
+		f.fileLock.Lock()
 		if len(f.fs) > mergingLimit {
 			f.MergeNeeded = true
 		}
+		f.fileLock.Unlock()
 	}
 
 	// Write to the active segment.
+	f.fileLock.Lock()
 	file := f.fs[segment]
+	f.fileLock.Unlock()
 	_, err = file.WriteString(s)
 	if err != nil {
 		return indexer.ObjectLocation{}, err
@@ -196,25 +202,29 @@ func (f *FileV1) appendAtSegment(s string, segment int,
 	var offset int
 	// If this object was appended to a new segment,
 	// its offset is zero.
+	f.fileLock.Lock()
 	if segment != f.currSegment {
 		offset = 0
 		f.prevObjLength = 0
+		f.fileLock.Unlock()
 		err = f.closeActiveFile()
 		if err != nil {
-			fmt.Println(err)
 			return indexer.ObjectLocation{}, err
 		}
+		f.fileLock.Lock()
 		f.currSegment = segment
 	} else {
 		offset = f.prevObjLength
 	}
 
 	f.prevObjLength += len(s)
+	currSegment := f.currSegment
+	f.fileLock.Unlock()
 
 	return indexer.ObjectLocation{
 		Offset:  offset,
 		Size:    len(s),
-		Segment: f.currSegment,
+		Segment: currSegment,
 	}, nil
 }
 
@@ -226,34 +236,50 @@ func (f *FileV1) appendAtSegment(s string, segment int,
 // Function call: deleteFilesTillIndex(3)
 // First 3 indexes are deleted.
 func (f *FileV1) deleteFilesTillIndex(index int) {
-	fmt.Println(index)
-	for i := 0; i <= index; i++ {
-		releaseFile(f.fName[0])
-	}
 
+	f.fileLock.Lock()
 	files := make([]*os.File, len(f.fs)-index-1)
 	fileNames := make([]string, len(f.fName)-index-1)
+
+	for i := 0; i < index; i++ {
+		os.Remove(f.fName[i])
+	}
+
 	copy(files, f.fs[index:])
 	copy(fileNames, f.fName[index:])
 
 	f.fs = files
 	f.fName = fileNames
+	f.fileLock.Unlock()
 }
 
+// closeFileOfSegment closes the file of the segment
+// provided as argument.
+//
+// This needs to be able to acquire a lock on "fileLock"
 func (f *FileV1) closeFileOfSegment(segment int) error {
 	// Close the previously opened file to not encounter
 	// errors of "Too many files open".
 	//
 	// Futher reading: https://stackoverflow.com/questions/64744802/safely-close-a-file-descriptor-in-golang
 	var err error
+	f.fileLock.Lock()
 	if _, err = os.Stat(f.fName[segment]); err == nil {
+		defer f.fileLock.Unlock()
 		return f.fs[segment].Close()
 	}
 	return err
 }
 
+// closeActiveFile closes the current file segment that
+// is being written.
+//
+// This needs to be able to acquire a lock on "fileLock".
 func (f *FileV1) closeActiveFile() error {
-	return f.closeFileOfSegment(f.currSegment)
+	f.fileLock.Lock()
+	currSegment := f.currSegment
+	f.fileLock.Unlock()
+	return f.closeFileOfSegment(currSegment)
 }
 
 func releaseFile(f string) {

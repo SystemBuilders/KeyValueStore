@@ -8,4 +8,6 @@ Design docs coming soon!
 Some issues:
 1. Map indexer compaction: how do you do the compaction? Copying and they compaction and then replace old with new? How will you copy consistently?
 2. How do merge when the merging files can be in use? How do you update the file segment data to all these?
+3. What basis are the merging happening??? They should be finding same keys and merge or something right? Whats happening now is basically putting data worth 5 files into one file. Which is complete bs. 
+
 Sumukha PK.

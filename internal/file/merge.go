@@ -67,7 +67,6 @@ func (w *WatchSet) RunJob() {
 			return
 		default:
 			if w.f.MergeNeeded {
-				// TODO: WatchSets lock? Does it even matter? Use KV's lock?
 				w.mu.Lock()
 				w.f.MergeNeeded = false
 
@@ -76,29 +75,39 @@ func (w *WatchSet) RunJob() {
 				// files until this file index.
 				mergingIndex := w.f.currSegment
 				// Creating the pseudo start point for the append function.
-				fmt.Println("Merging file created")
+				w.mu.Unlock()
 				err := w.f.createNewFileSegment()
 				if err != nil {
 					fmt.Println(err)
+					return
 				}
+
+				w.mu.Lock()
+				fmt.Println("Merging file created " + w.f.fName[len(w.f.fName)-1])
 				currSegment := w.f.currSegment + 1
 				offsets := make([]int, len(w.f.fs))
+				w.mu.Unlock()
 
 				for {
+					w.mu.Lock()
 					next, err := getNextElement(w.f, &offsets)
 					if err != nil {
+						w.mu.Unlock()
 						break
 					}
 					fmt.Print(next)
+					w.mu.Unlock()
 					objLoc, err := w.f.appendAtSegment(next, currSegment)
 					if err != nil {
 					}
 					w.idxr.Store(next, objLoc)
+					fmt.Println("Watchset")
+					w.idxr.Print()
+					fmt.Println(("Watchset"))
 				}
 
 				fmt.Println(mergingIndex)
 				w.f.deleteFilesTillIndex(mergingIndex + 1)
-				w.mu.Unlock()
 			}
 		}
 	}
@@ -116,7 +125,10 @@ func getNextElement(f *FileV1, offsets *[]int) (string, error) {
 		return "", err
 	}
 
-	least := 0
+	//
+	least := 1
+	(*offsets)[least] += (*offsets)[least-1] + len(val) + len(defaultDelimter)
+
 	for i := 1; i < len(f.fs); i++ {
 		next, err := readNext(f.fs[i], (*offsets)[i])
 		if err != nil {
@@ -128,7 +140,7 @@ func getNextElement(f *FileV1, offsets *[]int) (string, error) {
 		}
 	}
 
-	(*offsets)[least] += len(val) + len(defaultDelimter)
+	(*offsets)[least] += (*offsets)[least-1] + len(val) + len(defaultDelimter)
 	return val, nil
 }
 
@@ -177,3 +189,12 @@ func readNext(f *os.File, offset int) (string, error) {
 
 	return stringBuilder.String(), nil
 }
+
+/*
+
+This "getNextelemement" and the logic inside the merging is complete rubbish and doesnt merge.
+What its doing is --- you know.
+
+Need to create the actual merging logic and it needs to be optimal and in a different package as well.
+
+*/

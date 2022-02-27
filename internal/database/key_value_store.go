@@ -18,39 +18,35 @@ type KeyValueStore struct {
 	// f is the file where the kv store appends structured
 	// logs.
 	f file.File
-	// index is the way the file pertaining to the key-value
-	// store is indexed. This can be used to implement
-	// different indexing methods for different performance needs.
-	index indexer.Indexer
-	mu    *sync.Mutex
+	// idxrGntr is an object which can be used to generate
+	// a fresh instance of an indexer.
+	//
+	// This is necessary because the file layers need to
+	// create new indexers per segment on the fly instead
+	// of a global indexer per key value store.
+	idxrGntr indexer.IndexerGenerator
+	mu       *sync.Mutex
 }
 
 var _ Database = (*KeyValueStore)(nil)
 
 // NewKeyValueStore returns a new instance of a KV store.
-func NewKeyValueStore(ctx context.Context, index indexer.Indexer) (*KeyValueStore, error) {
-
-	// TODO: Not sure what this was intended at, wait.
-	if ctx.Value("storage") == "append" && index.Type() != "map" {
-		return nil, ErrBadIndexerForEngine
-	}
-
-	if ctx.Value("storage") == "sst" && index.Type() != "sst" {
-		return nil, ErrBadIndexerForEngine
-	}
+func NewKeyValueStore(
+	ctx context.Context,
+	idxrGntr indexer.IndexerGenerator,
+) (*KeyValueStore, error) {
 
 	mu := sync.Mutex{}
-	f, err := file.NewFileV1(ctx, &mu, index)
+	f, err := file.NewFileV2(idxrGntr)
 	if err != nil {
 		return nil, err
 	}
 
 	kvStore := &KeyValueStore{
-		ctx:   ctx,
-		f:     f,
-		index: index,
-
-		mu: &mu,
+		ctx:      ctx,
+		f:        f,
+		idxrGntr: idxrGntr,
+		mu:       &mu,
 	}
 
 	return kvStore, nil
