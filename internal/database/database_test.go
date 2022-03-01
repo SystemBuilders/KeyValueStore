@@ -21,7 +21,7 @@ func TestAppend(t *testing.T) {
 
 	insertCount := 0
 	for {
-		if insertCount == 1000 {
+		if insertCount == 5 {
 			break
 		}
 

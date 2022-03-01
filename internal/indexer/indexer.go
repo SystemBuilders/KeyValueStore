@@ -14,7 +14,7 @@ type Indexer interface {
 	// Query allows the user to query the indexer.
 	// Based on the QueryType parameter, data can be
 	// queried in multiple ways.
-	Query(interface{}) ObjectLocation
+	Query(interface{}) (ObjectLocation, error)
 	// Print prints the indexer in an explicit manner.
 	Print()
 }
@@ -26,14 +26,9 @@ type ObjectLocation struct {
 	// object from the beginning of the file. This is
 	// the number that is calculated by the APIs written
 	// here and not from any external APIs.
-	Offset int
+	Offset int64
 	// Size describes the size of this particular object.
 	Size int
-
-	// Segment describes the segment of the file the object
-	// is a part of. It is presumed that the files are always
-	// segmented for a much faster and scalable approach.
-	Segment int
 }
 
 // QueryType allows to query the indexer in a desired manner.

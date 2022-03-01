@@ -8,16 +8,17 @@ import (
 
 	"github.com/SystemBuilders/KeyValueStore/internal/dataobject"
 	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
-
-	"github.com/SystemBuilders/KeyValueStore/internal/file"
+	"github.com/SystemBuilders/KeyValueStore/internal/storage"
 )
 
 // KeyValueStore implements the Database interface.
 type KeyValueStore struct {
 	ctx context.Context
-	// f is the file where the kv store appends structured
-	// logs.
-	f file.File
+	// s is the backing storage of the kev-value store
+	// where the incoming data is persisted. This also
+	// provides methods to query the stored data based
+	// on the key.
+	s storage.Storage
 	// idxrGntr is an object which can be used to generate
 	// a fresh instance of an indexer.
 	//
@@ -37,14 +38,14 @@ func NewKeyValueStore(
 ) (*KeyValueStore, error) {
 
 	mu := sync.Mutex{}
-	f, err := file.NewFileV2(idxrGntr)
+	s, err := storage.NewStorageV1(ctx, idxrGntr)
 	if err != nil {
 		return nil, err
 	}
 
 	kvStore := &KeyValueStore{
 		ctx:      ctx,
-		f:        f,
+		s:        s,
 		idxrGntr: idxrGntr,
 		mu:       &mu,
 	}
@@ -63,7 +64,7 @@ func (kv *KeyValueStore) Insert(key []byte, value interface{}) error {
 		return err
 	}
 
-	return kv.insert(key, string(data))
+	return kv.insert(key, data)
 }
 
 // Query returns the last appended Object type from the file, or
@@ -71,13 +72,11 @@ func (kv *KeyValueStore) Insert(key []byte, value interface{}) error {
 // Query uses the indexed value to get the object location and
 // uses the file API to query the data.
 func (kv *KeyValueStore) Query(key []byte) (interface{}, error) {
-	kv.mu.Lock()
-	logIndex := kv.index.Query(key)
-	data, err := kv.f.ReadAt(logIndex)
+	data, err := kv.s.Query(key)
 	if err != nil {
 		return nil, err
 	}
-	kv.mu.Unlock()
+
 	return data, nil
 }
 
@@ -86,30 +85,20 @@ func (kv *KeyValueStore) Delete(key []byte) error {
 	return ErrUnsupported
 }
 
-// indexLog indexes the log that was appended to the file.
-func (kv *KeyValueStore) indexLog(key []byte, objLoc indexer.ObjectLocation) {
-	kv.index.Store(
-		key,
-		objLoc,
-	)
-}
-
 // insert is a storage and indexer aware inserting method that
 // stores the key, value pair in the storage engine and indexes
 // into the appropriate indexer.
-func (kv *KeyValueStore) insert(key []byte, data string) error {
+func (kv *KeyValueStore) insert(key, data []byte) error {
 
 	switch kv.ctx.Value("storage") {
 	case "append":
-		// Need a wrapper function here that'll append based
+		// TODO: Need a wrapper function here that'll append based
 		// on the ctx of the KV Store.
 
-		objLoc, err := kv.f.Append(kv.ctx, data)
+		err := kv.s.Append(key, data)
 		if err != nil {
 			return err
 		}
-
-		kv.indexLog(key, objLoc)
 	case "sst":
 	default:
 		fmt.Println(kv.ctx.Value("storage"))

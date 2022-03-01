@@ -37,12 +37,7 @@ func (m *Map) Type() string {
 // This is a race-safe method.
 func (m *Map) Store(key interface{}, loc indexer.ObjectLocation) {
 	m.l.Lock()
-	// key interface is type asserted as byte and converted
-	// to string type as a map cannot insert a "byte" type.
-	//
-	// This is being done only at this level because
-	// only the map type has a problem with types.
-	keyString := string(key.([]byte))
+	keyString := key.(string)
 	m.index[keyString] = loc
 	m.l.Unlock()
 }
@@ -50,16 +45,14 @@ func (m *Map) Store(key interface{}, loc indexer.ObjectLocation) {
 // Query returns the ObjectLocation for the given key.
 //
 // This is a race-safe method.
-func (m *Map) Query(key interface{}) indexer.ObjectLocation {
+func (m *Map) Query(key interface{}) (indexer.ObjectLocation, error) {
 	m.l.Lock()
-	defer m.l.Unlock()
-	// key interface is type asserted as byte and converted
-	// to string type as a map cannot query a "byte" type.
-	//
-	// This is being done only at this level because
-	// only the map type has a problem with types.
-	keyString := string(key.([]byte))
-	return m.index[keyString]
+	if objLoc, ok := m.index[key]; ok {
+		m.l.Unlock()
+		return objLoc, nil
+	}
+	m.l.Unlock()
+	return indexer.ObjectLocation{}, indexer.ErrDataDoesntExistInIndexer
 }
 
 // Print prints the indexer map.
