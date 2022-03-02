@@ -33,9 +33,6 @@ func TestAppend(t *testing.T) {
 		insertCount++
 	}
 
-	// kv.index.Print()
-
-	fmt.Println("Go")
 	data, err := kv.Query([]byte("key0"))
 	if err != nil {
 		log.Fatal(err)

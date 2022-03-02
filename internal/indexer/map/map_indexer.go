@@ -58,6 +58,6 @@ func (m *Map) Query(key interface{}) (indexer.ObjectLocation, error) {
 // Print prints the indexer map.
 func (m *Map) Print() {
 	m.l.Lock()
-	fmt.Println(m.index)
+	fmt.Print(m.index)
 	m.l.Unlock()
 }

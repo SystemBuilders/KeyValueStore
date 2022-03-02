@@ -58,6 +58,8 @@ func NewKeyValueStore(
 // Insert writes the data to the file, gets the location of the object
 // and finally indexes it into the provided indexer.
 func (kv *KeyValueStore) Insert(key []byte, value interface{}) error {
+	// We append both the key and the value together as a
+	// dataObject type.
 	obj := dataobject.NewObject(key, value)
 	data, err := json.Marshal(obj)
 	if err != nil {
@@ -77,7 +79,15 @@ func (kv *KeyValueStore) Query(key []byte) (interface{}, error) {
 		return nil, err
 	}
 
-	return data, nil
+	// Extract the value from stored data object
+	// which has both the key and the value.
+	var dbObj dataobject.Object
+	err = json.Unmarshal([]byte(data), &dbObj)
+	if err != nil {
+		return nil, err
+	}
+
+	return dbObj.Value, nil
 }
 
 // Delete deletes all entries of the

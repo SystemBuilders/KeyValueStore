@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
 	"github.com/SystemBuilders/KeyValueStore/internal/storage/linkedlist"
@@ -25,9 +26,23 @@ type StorageV1 struct {
 	// currSegment is the active segment where the
 	// data is being written to.
 	currSegment *linkedlist.DLLNode
+	// idxrGntr is the indexer generator which will
+	// be used to pass on new indexers when creating
+	// fresh segments.
+	idxrGntr indexer.IndexerGenerator
 }
 
 var _ (Storage) = (*StorageV1)(nil)
+
+var (
+	// mergingLimit is the limit of the number of files
+	// tolerable by the system and the threshold where
+	// compaction and merging must occur.
+	//
+	// Currently an arbitrarily set number, this can be
+	// based on speed, RAM size etc.
+	mergingLimit int = 2
+)
 
 // NewStorageV1 creates a new instance of StorageV1.
 //
@@ -47,6 +62,7 @@ func NewStorageV1(ctx context.Context,
 		ctx:         ctx,
 		fs:          segmentNode,
 		currSegment: segmentNode,
+		idxrGntr:    idxrGntr,
 	}, nil
 }
 
@@ -82,7 +98,19 @@ func (s *StorageV1) append(key string, data string) error {
 	}
 
 	s.print()
-	// TODO: Monitor the currSegment, move to a new segment if necessary.
+
+	// Monitor the currSegment, move to a new segment if necessary.
+	if curSeg.IsFull {
+		segment, err := segment.NewSegment(s.idxrGntr.Generate())
+		if err != nil {
+			return err
+		}
+
+		segmentNode := linkedlist.NewDLLNode(segment)
+		s.currSegment.AppendToRight(segmentNode)
+		s.currSegment = segmentNode
+	}
+
 	return nil
 }
 
@@ -104,12 +132,13 @@ func (s *StorageV1) query(key string) (string, error) {
 		data, err := (activeSegment.Value).(*segment.Segment).Query(key)
 		// If we see that the data doesn't exist according to the
 		// segment, we move on to the previous segment if it exists.
-		if err == ErrDataDoesntExistInSegment {
-			if activeSegment.Left != nil {
-				activeSegment = activeSegment.Left
-			} else {
+		if err == segment.ErrDataDoesntExistInSegment {
+			// If this is the last segment, data doesn't exist
+			// in the storage.
+			if activeSegment.Left == nil {
 				return "", ErrDataNotFound
 			}
+			activeSegment = activeSegment.Left
 		} else if err != nil {
 			return "", err
 		} else {
@@ -121,11 +150,14 @@ func (s *StorageV1) query(key string) (string, error) {
 	return queryData, nil
 }
 
+// print prints the chain of segments by calling
+// the underlying segment print methods.
 func (s *StorageV1) print() {
 	head := s.fs
 
-	if head != nil {
+	for head != nil {
 		(head.Value).(*segment.Segment).Print()
 		head = head.Right
 	}
+	fmt.Println("")
 }

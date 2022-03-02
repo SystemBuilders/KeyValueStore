@@ -3,6 +3,7 @@ package segment
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
@@ -11,17 +12,10 @@ import (
 var (
 	// maxFileSize signifies the max file size accepted
 	// by the key-value store.
-	maxFileSize int64 = 2
+	maxFileSize int64 = 75
 	// defaultDelimiter is the delimiter set as default for
 	// writing to the file.
 	defaultDelimter string = "\\o/"
-	// mergingLimit is the limit of the number of files
-	// tolerable by the system and the threshold where
-	// compaction and merging must occur.
-	//
-	// Currently an arbitrarily set number, this can be
-	// based on speed, RAM size etc.
-	mergingLimit int = 2
 )
 
 // Segment describes a logical segment where the
@@ -48,6 +42,16 @@ type Segment struct {
 	// offset holds the current offset at which the
 	// last byte is written in the segment's file.
 	offset int64
+	// IsFull signifies whether this segment has run over
+	// the preset limit for the associated file. Default
+	// value is FALSE.
+	//
+	// Once this limit is reached, the variable will
+	// always be set to true to signify no more data
+	// can be appended. However, if a merging or
+	// compaction operation was performed, it can change
+	// this status.
+	IsFull bool
 }
 
 // newSegment is an internal only function used to
@@ -65,6 +69,7 @@ func NewSegment(idxr indexer.Indexer) (*Segment, error) {
 		fName:  fName,
 		idxr:   idxr,
 		offset: 0,
+		IsFull: false,
 	}, nil
 }
 
@@ -82,11 +87,16 @@ func (sg *Segment) Append(key string, data string) error {
 		return err
 	}
 
-	sg.offset += int64(len(data))
+	err = sg.verifyFileSizeLimits()
+	if err != nil {
+		return err
+	}
+
 	objLoc := indexer.ObjectLocation{
 		Offset: sg.offset,
 		Size:   len(data),
 	}
+	sg.offset += int64(len(data))
 
 	sg.idxr.Store(key, objLoc)
 	return nil
@@ -102,16 +112,40 @@ func (sg *Segment) Append(key string, data string) error {
 func (sg *Segment) Query(key string) (string, error) {
 	objLoc, err := sg.idxr.Query(key)
 	if err == indexer.ErrDataDoesntExistInIndexer {
+		return "", ErrDataDoesntExistInSegment
+	}
+
+	data, err := sg.readAt(objLoc)
+	if err != nil {
 		return "", err
 	}
 
-	return sg.readAt(objLoc)
+	return removeDelimiter(data), nil
 }
 
 // Print prints the associated indexer of the segment.
 func (sg *Segment) Print() {
 	sg.idxr.Print()
-	fmt.Println("")
+	fmt.Printf(" <-> ")
+}
+
+// verifyFileSizeLimits is responsible to check whether
+// the segment's associated file is past its given limit
+// in size. If it is, the IsFull flag will be set to TRUE.
+//
+// It is ensured that the control won't flow to this method
+// if the IsFull variable is already set to TRUE.
+func (sg *Segment) verifyFileSizeLimits() error {
+	info, err := os.Stat(sg.fName)
+	if err != nil {
+		return err
+	}
+
+	if info.Size() > maxFileSize {
+		sg.IsFull = true
+	}
+
+	return nil
 }
 
 // readAt reads the data in the file associated with
@@ -159,4 +193,12 @@ func createNewFileForSegment() (*os.File, string, error) {
 	}
 
 	return file, fName, nil
+}
+
+// removeDelimiter removes the trailing delimiter from
+// the string.
+// This might be an expensive operation, but we have to
+// do it.
+func removeDelimiter(str string) string {
+	return strings.TrimSuffix(str, defaultDelimter)
 }
