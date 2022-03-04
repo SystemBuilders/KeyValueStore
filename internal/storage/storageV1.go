@@ -97,7 +97,7 @@ func (s *StorageV1) append(key string, data string) error {
 		return err
 	}
 
-	s.print()
+	// s.print()
 
 	// Monitor the currSegment, move to a new segment if necessary.
 	if curSeg.IsFull {

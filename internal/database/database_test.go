@@ -21,7 +21,7 @@ func TestAppend(t *testing.T) {
 
 	insertCount := 0
 	for {
-		if insertCount == 5 {
+		if insertCount == 1000 {
 			break
 		}
 
@@ -33,7 +33,7 @@ func TestAppend(t *testing.T) {
 		insertCount++
 	}
 
-	data, err := kv.Query([]byte("key0"))
+	data, err := kv.Query([]byte("key929"))
 	if err != nil {
 		log.Fatal(err)
 	}
