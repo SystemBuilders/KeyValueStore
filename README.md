@@ -9,5 +9,6 @@ Some issues:
 1. Map indexer compaction: how do you do the compaction? Copying and they compaction and then replace old with new? How will you copy consistently?
 2. How do merge when the merging files can be in use? How do you update the file segment data to all these?
 3. What basis are the merging happening??? They should be finding same keys and merge or something right? Whats happening now is basically putting data worth 5 files into one file. Which is complete bs. 
+4. There was some idea I had about having multiple instances of KV store and then firing them with the queries and seeing if they have consistent results. This doesnt make sense now, but it did when I woke up from my sleep and seen this in my dream. Work on this, there may be something.
 
 Sumukha PK.

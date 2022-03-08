@@ -87,7 +87,7 @@ func (sg *Segment) Append(key string, data string) error {
 		return err
 	}
 
-	err = sg.verifyFileSizeLimits()
+	err = sg.verifyFileSizeLimits(maxFileSize)
 	if err != nil {
 		return err
 	}
@@ -135,13 +135,16 @@ func (sg *Segment) Print() {
 //
 // It is ensured that the control won't flow to this method
 // if the IsFull variable is already set to TRUE.
-func (sg *Segment) verifyFileSizeLimits() error {
+//
+// This has the file size as an argument so that it's
+// configurable always.
+func (sg *Segment) verifyFileSizeLimits(fileSize int64) error {
 	info, err := os.Stat(sg.fName)
 	if err != nil {
 		return err
 	}
 
-	if info.Size() > maxFileSize {
+	if info.Size() > fileSize {
 		sg.IsFull = true
 	}
 
