@@ -56,6 +56,8 @@ func Test_Append(t *testing.T) {
 	assert.Equal(t, writtenData, string(fileData))
 }
 
+// Test_Query tests whether the queried data is
+// same as the appended one.
 func Test_Query(t *testing.T) {
 	idxr := _map.NewMapIndexer()
 	sg, err := NewSegment(idxr)
@@ -67,7 +69,10 @@ func Test_Query(t *testing.T) {
 	err = sg.Append(testKey, testData)
 	assert.Nil(t, err)
 
-	// TODO:
+	obtainedData, err := sg.Query(testKey)
+	assert.Nil(t, err)
+
+	assert.Equal(t, testData, obtainedData)
 }
 
 // Test_verifyFileSizeLimits creates a file which is
@@ -78,7 +83,7 @@ func Test_Query(t *testing.T) {
 // function acts accordingly.
 func Test_verifyFileSizeLimits(t *testing.T) {
 	idxr := _map.NewMapIndexer()
-	
+
 	// Testing true case.
 	sg, err := NewSegment(idxr)
 	assert.Nil(t, err)
@@ -101,8 +106,8 @@ func Test_verifyFileSizeLimits(t *testing.T) {
 	assert.False(t, sg2.IsFull)
 
 	err = sg2.verifyFileSizeLimits(10)
-	assert.Nil(t,err)
-	assert.False(t,sg2.IsFull)
+	assert.Nil(t, err)
+	assert.False(t, sg2.IsFull)
 }
 
 // Test_readAt tests whether the right string is
@@ -111,7 +116,7 @@ func Test_verifyFileSizeLimits(t *testing.T) {
 //
 // This is done by appending some data and then
 // accessing the indexer of the segment which will
-// used to get the location of the object.
+// be used to get the location of the object.
 func Test_readAt(t *testing.T) {
 	idxr := _map.NewMapIndexer()
 	sg, err := NewSegment(idxr)
@@ -121,7 +126,14 @@ func Test_readAt(t *testing.T) {
 	testData := "dataString"
 
 	err = sg.Append(testKey, testData)
-	assert.Nil(t,err)
-	
+	assert.Nil(t, err)
 
+	objLoc, err := sg.idxr.Query(testKey)
+	assert.Nil(t, err)
+
+	obtainedString, err := sg.readAt(objLoc)
+	assert.Nil(t, err)
+
+	expectedString := testData + defaultDelimter
+	assert.Equal(t, expectedString, obtainedString)
 }
