@@ -27,6 +27,15 @@ var (
 // advantage of not over-loading the indexer implementation
 // and also enables us to operate on the segments
 // for merging and compaction operations.
+//
+// There are no limits for appending into a single
+// segment object enforced as such by the Segment API.
+// Any existing limits will originate only from the
+// underlying os.File API implementation and thus care
+// must be taken by the users of this API to set safe
+// file size limits during init of this segment.
+//
+// TODO: Configurable segment sizes. Low priority.
 type Segment struct {
 	// f is the handle for the underlying file
 	// os.File implementation. This is where the
