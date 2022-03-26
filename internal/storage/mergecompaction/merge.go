@@ -6,43 +6,36 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/SystemBuilders/KeyValueStore/internal/dataobject"
-	"github.com/SystemBuilders/KeyValueStore/internal/indexer"
 )
 
 // WatchSet is a collection of objects that a merge job
 // needs to keep an eye on and use.
 type WatchSet struct {
-	ctx  context.Context
-	f    *FileV1
-	mu   *sync.Mutex
-	idxr indexer.Indexer
+	ctx       context.Context
+	mergeFunc func()
 }
 
 // NewWatchSet returns a new WatchSet.
 func NewWatchSet(
-	ctx context.Context,
-	f *FileV1,
-	idxr indexer.Indexer,
-	mu *sync.Mutex,
+	f func(),
 ) *WatchSet {
 	return &WatchSet{
-		ctx:  ctx,
-		f:    f,
-		idxr: idxr,
-		mu:   mu,
+		mergeFunc: f,
 	}
 }
 
-// RunJob runs a job which checks on changes in
-// the file segments sizes. When the size reaches a
-// threshold, it runs a merge job between the segments.
+// RunJob is to be run on a goroutine in parallel to the
+// other operations. (TODO: This might have a lot of
+// closing issues since its on a different goroutine.)
 //
-// This is supposed to run in parallel to watch on the
-// WatchSet, and perform the merge job whenever deemed
-// necessary.
+// This function checks whether the trigger is set by
+// functions who actually have the data about the segment
+// and can take the decisions and performs the operation
+// if the trigger is set.
+//
+// TODO: First figure out how do we merge.
 //
 // This function opens all non-operational files, at
 // once (this is possible based on the estimate of the
@@ -61,54 +54,56 @@ func NewWatchSet(
 // control of the segments and appends, which I don't
 // intend to do.
 func (w *WatchSet) RunJob() {
+
 	for {
 		select {
 		case <-w.ctx.Done():
 			return
 		default:
-			if w.f.MergeNeeded {
-				w.mu.Lock()
-				w.f.MergeNeeded = false
 
-				fmt.Println("Merging operation commencing")
-				// Record the merging index so that we can delete the
-				// files until this file index.
-				mergingIndex := w.f.currSegment
-				// Creating the pseudo start point for the append function.
-				w.mu.Unlock()
-				err := w.f.createNewFileSegment()
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
+			// if w.f.MergeNeeded {
+			// 	w.mu.Lock()
+			// 	w.f.MergeNeeded = false
 
-				w.mu.Lock()
-				fmt.Println("Merging file created " + w.f.fName[len(w.f.fName)-1])
-				currSegment := w.f.currSegment + 1
-				offsets := make([]int, len(w.f.fs))
-				w.mu.Unlock()
+			// 	fmt.Println("Merging operation commencing")
+			// 	// Record the merging index so that we can delete the
+			// 	// files until this file index.
+			// 	mergingIndex := w.f.currSegment
+			// 	// Creating the pseudo start point for the append function.
+			// 	w.mu.Unlock()
+			// 	err := w.f.createNewFileSegment()
+			// 	if err != nil {
+			// 		fmt.Println(err)
+			// 		return
+			// 	}
 
-				for {
-					w.mu.Lock()
-					next, err := getNextElement(w.f, &offsets)
-					if err != nil {
-						w.mu.Unlock()
-						break
-					}
-					fmt.Print(next)
-					w.mu.Unlock()
-					objLoc, err := w.f.appendAtSegment(next, currSegment)
-					if err != nil {
-					}
-					w.idxr.Store(next, objLoc)
-					fmt.Println("Watchset")
-					w.idxr.Print()
-					fmt.Println(("Watchset"))
-				}
+			// 	w.mu.Lock()
+			// 	fmt.Println("Merging file created " + w.f.fName[len(w.f.fName)-1])
+			// 	currSegment := w.f.currSegment + 1
+			// 	offsets := make([]int, len(w.f.fs))
+			// 	w.mu.Unlock()
 
-				fmt.Println(mergingIndex)
-				w.f.deleteFilesTillIndex(mergingIndex + 1)
-			}
+			// 	for {
+			// 		w.mu.Lock()
+			// 		next, err := getNextElement(w.f, &offsets)
+			// 		if err != nil {
+			// 			w.mu.Unlock()
+			// 			break
+			// 		}
+			// 		fmt.Print(next)
+			// 		w.mu.Unlock()
+			// 		objLoc, err := w.f.appendAtSegment(next, currSegment)
+			// 		if err != nil {
+			// 		}
+			// 		w.idxr.Store(next, objLoc)
+			// 		fmt.Println("Watchset")
+			// 		w.idxr.Print()
+			// 		fmt.Println(("Watchset"))
+			// 	}
+
+			// 	fmt.Println(mergingIndex)
+			// 	w.f.deleteFilesTillIndex(mergingIndex + 1)
+			// }
 		}
 	}
 }
@@ -161,7 +156,7 @@ func readNext(f *os.File, offset int) (string, error) {
 	)
 	reader := bufio.NewReader(f)
 	for {
-		data, err := reader.Peek(len(defaultDelimter))d
+		data, err := reader.Peek(len(defaultDelimter))
 		if err != nil {
 			return "", err
 		}
